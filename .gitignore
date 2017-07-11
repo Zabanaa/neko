@@ -1,0 +1,9 @@
+ENV__*
+sheets.*
+neko.sh
+client_secret.json
+*.pyc
+__pycache__
+*.swo
+*.swp
+sheets.*
