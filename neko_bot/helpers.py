@@ -1,12 +1,22 @@
+import sys
 import random
 import twitter
 import os
 import pygsheets
+from .log import logger
 
 NEKO_CONSUMER_KEY        = os.getenv("NEKO_CONSUMER_KEY")
 NEKO_CONSUMER_SECRET     = os.getenv("NEKO_CONSUMER_SECRET")
 NEKO_ACCESS_TOKEN_KEY    = os.getenv("NEKO_ACCESS_TOKEN_KEY")
 NEKO_ACCESS_TOKEN_SECRET = os.getenv("NEKO_ACCESS_TOKEN_SECRET")
+NEKO_SPREADSHEET_NAME    = os.getenv("NEKO_SPREADSHEET_NAME")
+
+api = twitter.Api(
+    consumer_key=NEKO_CONSUMER_KEY,
+    consumer_secret=NEKO_CONSUMER_SECRET,
+    access_token_key=NEKO_ACCESS_TOKEN_KEY,
+    access_token_secret=NEKO_ACCESS_TOKEN_SECRET
+)
 
 def login_to_twitter():
 
@@ -17,26 +27,17 @@ def login_to_twitter():
         Returns the api object otherwise.
     """
 
-    api = twitter.Api(
-                consumer_key=NEKO_CONSUMER_KEY,
-                consumer_secret=NEKO_CONSUMER_SECRET,
-                access_token_key=NEKO_ACCESS_TOKEN_KEY,
-                access_token_secret=NEKO_ACCESS_TOKEN_SECRET
-    )
-
     print("Logging in to twitter ...")
 
     try:
 
         api.VerifyCredentials()
 
-    except twitter.error.TwitterError:
-        print("Could not authenticate you. Please check your credentials. \
-You need your consumer_key, consumer_secret, access_token_key \
-and access_token_secret to access the service.")
-        # Log the error to a file
-        return
-        # sys.exit
+    except twitter.error.TwitterError as e:
+        print("An error occured while authenticating you. \
+Please check the logs for more information")
+        logger.error("Error: - {}".format(e))
+        return sys.exit()
 
     else:
         print("Logged in!")
@@ -57,17 +58,34 @@ def login_to_google_sheets():
 
     try:
         gc = pygsheets.authorize()
+
     except Exception as e:
-        print("Could not authenticate you to google sheets: {}".format(e))
-        # Log the error to a file
-        return
-        # sys.exit
+        print("Could not authenticate you to google sheets. \
+Please check the logs for more information")
+        logger.error("Error: - {}".format(e))
+        return sys.exit()
+
+    print("All good ! \n Opening spreadsheet ...")
+    return gc
+
+# ========================================================================= #
+
+def open_sheet(connection):
+
+    """
+        Tries to open NEKO_SPREADSHEET_NAME
+        In case of error, we log it to the file
+        Else we return the worksheet
+    """
+
+    try:
+        worksheet = connection.open(NEKO_SPREADSHEET_NAME).sheet1
+    except pygsheets.exceptions.SpreadsheetNotFound as e:
+        print("Error - Spreadsheet '{}' does not exist".format(NEKO_SPREADSHEET_NAME))
+        return sys.exit()
     else:
-        print("All good !")
-        print("Opening spreadsheet ...")
-        sheet               = gc.open("Tweets").sheet1
         print("Spreadsheet opened !")
-        return sheet
+        return worksheet
 
 # ========================================================================= #
 
@@ -85,7 +103,7 @@ def fetch_random_tweet_from_google_sheet(sheet):
 
 # ========================================================================= #
 
-def publish_tweet(api_connection, tweet):
+def publish_tweet(tweet):
 
     """
         Accepts a string as an argument
@@ -95,10 +113,10 @@ def publish_tweet(api_connection, tweet):
 
     try:
         print("Posting update to twitter ...")
-        api_connection.PostUpdate(tweet)
+        api.PostUpdate(tweet)
     except Exception as e:
-        print(e)
-        # log the issue
+        print("Could not publish tweet. Please check the logs for more info")
+        logger.error(e)
     else:
         print("Posted !")
 
